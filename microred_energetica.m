@@ -1,0 +1,189 @@
+%% Defnición del vector de tiempo
+% Creamos un vector "horas" que va de 1 a 24.
+% Este vector será nuestro eje X en todas las gráficas.
+
+horas = 1:24;
+
+%% PUNTO A: GENERACIÓN SOLAR
+%    sube por la mañana, alcanza su máximo al mediodía y baja por la tarde.
+
+%    Fórmula: P_solar(h) = Pmax * sin(pi * (h - h_salida) / (h_puesta - h_salida))
+%    donde:
+%      - h_salida  = hora de salida del sol (hora 6)
+%      - h_puesta  = hora de puesta del sol (hora 18)
+%      - Pmax      = 25 kW (potencia pico)
+%      - En hora 6:  sin(0)  = 0 kW   → amanece
+%      - En hora 12: sin(pi/2) = 25 kW → pico máximo
+%      - En hora 18: sin(pi) = 0 kW   → anochece
+
+Pmax_solar = 25;  % Potencia máxima solar en kW
+
+% Inicializamos el vector con ceros (24 posiciones = 24 horas).
+% Por defecto todas las horas tienen 0 kW (noche).
+generacion_solar = zeros(1, 24);
+
+% Definimos las horas de producción solar: de la hora 6 (Hora de salida) a la hora 18(Hora de puesta del sol).
+h_salida  = 6; 
+h_puesta  = 18;  
+
+% Calculamos la potencia solar solo para las horas diurnas (6 a 18).
+% Usamos un bucle for para recorrer cada hora diurna y aplicar la fórmula.
+for h = h_salida:h_puesta
+    % sin(pi * (h - 6) / (18 - 6)) genera valores entre 0 y 1.
+    % Multiplicamos por Pmax_solar para escalar al rango 0-25 kW.
+    generacion_solar(h) = Pmax_solar * sin(pi * (h - h_salida) / (h_puesta - h_salida));
+end
+
+% Verificación: mostramos el vector en consola para comprobar valores.
+fprintf('--- PUNTO A: Generación Solar (kW) ---\n');
+fprintf('Hora %2d: %.2f kW\n', [horas; generacion_solar]);
+fprintf('\n');
+
+
+%%  PUNTO B: GENERACIÓN EÓLICA (AEROGENERADORES)
+%  Estrategia de modelado:
+%  El viento es irregular. Definimos manualmente valores que simulan subidas y
+%    bajadas realistas: más viento de madrugada y noche.
+
+Pmax_eolica = 15;  % Potencia máxima nominal del aerogenerador en kW
+
+% Cada valor corresponde a la hora respectiva 
+generacion_eolica = [11.5, 14.0, 10.5, 8.2, 6.0, ...   
+                     6.5, 5.0, 4.5, 3.8,  5.2, ...    
+                     2.0, 6.5, 3.8, 7.0,  2.5, ...     
+                     8.0, 9.5, 11.0, 12.5, 13.0, ...   
+                     14.5, 13.0, 12.5, 13.5];            
+
+% Verificación: nos aseguramos de que ningún valor supere Pmax_eolica.
+if max(generacion_eolica) > Pmax_eolica
+    warning('¡ALERTA! Algún valor eólico supera los %.1f kW.', Pmax_eolica);
+else
+    fprintf('--- PUNTO B: Generación Eólica (kW) ---\n');
+    fprintf('Valor máximo eólico: %.2f kW (Límite: %.1f kW) ✓\n', ...
+            max(generacion_eolica), Pmax_eolica);
+    fprintf('Hora %2d: %.2f kW\n', [horas; generacion_eolica]);
+    fprintf('\n');
+end
+
+%%  PUNTO C: GENERACIÓN HÍBRIDA TOTAL
+%  Estrategia:
+%  Sumaremos los valores uno a uno de generacion solar con los de
+%  generacion eolica
+%  generacion_total(T) = generacion_solar(nA) + generacion_eolica(nB)
+%  En cada hora del día.
+
+generacion_total = generacion_solar + generacion_eolica;
+
+fprintf('--- PUNTO C: Generación Híbrida Total (kW) ---\n');
+fprintf('Hora %2d: %.2f kW (Solar: %.2f + Eólica: %.2f)\n', ...
+        [horas; generacion_total; generacion_solar; generacion_eolica]);
+fprintf('\n');
+
+
+%%  PUNTO D: DEMANDA DE LA COMUNIDAD
+
+%  Estrategia de modelado:
+%    Definimos manualmente cada valor respetando los rangos establecidos.
+%    El perfil simula un pueblo rural donde:
+%    - De madrugada el consumo es mínimo (oscilará entre 2 kW y 4 kW).
+%    - Por el día sube por la escuela y bombeo agrícola (oscilando entre 6
+%      kW y 10 kW.)
+%    - Por la tarde-noche se dispara por alumbrado público y uso doméstico
+%      (𝑃𝑚𝑎𝑥_𝑑𝑒𝑚𝑎𝑛𝑑𝑎=15 kW).
+
+Pmax_demanda = 15; 
+demanda = [2.5, 2.0, 2.0, 2.5, 3.0, ...     % Horas 1-5
+           6.5, 7.0, 8.5, 9.0, 8.0, ...     % Horas 6-10
+           7.5, 8.0, 9.5, 9.0, 8.5, ...     % Horas 11-15
+           9.0, 9.5, ...                    % Horas 16-17
+           14.5, 15.0, 14.5, 13.5, ...      % Horas 18-21
+           4.0, 3.5, 3.0];                  % Horas 22-24
+
+% Verificaciones de los rangos establecidos:
+fprintf('--- PUNTO D: Demanda de la Comunidad (kW) ---\n');
+
+% Verificar rango nocturno (horas 1-5 y 22-24): debe estar entre 2 y 4 kW
+horas_nocturnas = [1:5, 22:24];
+rango_nocturno_ok = all(demanda(horas_nocturnas) >= 2 & demanda(horas_nocturnas) <= 4);
+fprintf('Rango nocturno (2-4 kW): %s\n', string(rango_nocturno_ok));
+
+% Verificar rango diurno (horas 6-17): debe estar entre 6 y 10 kW
+horas_diurnas = 6:17;
+rango_diurno_ok = all(demanda(horas_diurnas) >= 6 & demanda(horas_diurnas) <= 10);
+fprintf('Rango diurno (6-10 kW): %s\n', string(rango_diurno_ok));
+
+% Verificar pico (horas 18-21): no debe superar 15 kW
+horas_pico = 18:21;
+rango_pico_ok = all(demanda(horas_pico) <= Pmax_demanda);
+fprintf('Rango pico (<=15 kW): %s\n', string(rango_pico_ok));
+
+fprintf('Hora %2d: %.2f kW\n', [horas; demanda]);
+fprintf('\n');
+
+%%  PUNTO E: VISUALIZACIÓN GRÁFICA
+
+%  Comandos utilizados:
+%    - figure()  → crea una nueva ventana de figura.
+%    - plot()    → dibuja una curva con los datos proporcionados.
+%    - hold on   → permite superponer múltiples curvas en la misma figura.
+%    - title()   → agrega un título al gráfico.
+%    - xlabel()  → etiqueta el eje X.
+%    - ylabel()  → etiqueta el eje Y.
+%    - legend()  → agrega una leyenda para identificar las curvas.
+%    - grid on   → activa la cuadrícula de fondo.
+%    - xlim()    → define los límites del eje X.
+%    - xticks()  → define las marcas del eje X.
+
+% Creamos una nueva ventana de figura con un nombre descriptivo.
+figure('Name', 'Micro-Red Energética durante 24 Horas', ...
+       'NumberTitle', 'off');
+
+% Graficamos la Generación Total:
+
+plot(horas, generacion_total, '-o', ...
+     'Color', [0 0.6 0], ...
+     'LineWidth', 2, ...
+     'MarkerSize', 5, ...
+     'DisplayName', 'Generación Total (Solar + Eólica)');
+
+% hold on: permite agregar
+% más curvas sin borrar la anterior y al finalizar de poner las curvas que
+% necesitemos colocaresmos hold:off.
+hold on;
+% Graficamos la Demanda de la Comunidad:
+%   - Color rojo 'r' → asociado con consumo/demanda.
+
+plot(horas, demanda, '-s', ...
+     'Color', [0.8 0 0], ...
+     'LineWidth', 2, ...
+     'MarkerSize', 5, ...
+     'DisplayName', 'Demanda de la Comunidad');
+
+hold off;
+
+%% Formato de la presentacion del gráfico
+
+% Título descriptivo del gráfico.
+title('Comportamiento Energético de una Micro-Red durante 24 Horas)', ...
+      'FontSize', 14, 'FontWeight', 'bold');
+
+% Etiqueta del eje X: representa el tiempo.
+xlabel('Tiempo (Horas del día)', 'FontSize', 12);
+
+% Etiqueta del eje Y: representa la potencia.
+ylabel('Potencia (kW)', 'FontSize', 12);
+
+% Leyenda: identifica cada curva en el gráfico.
+% 'Location', 'northwest' → la coloca en la esquina superior izquierda.
+legend('Location', 'northwest', 'FontSize', 10);
+
+% Cuadrícula de fondo: facilita la lectura de valores.
+grid on;
+
+% Definimos que el eje X muestre de 1 a 24, con marcas cada hora.
+xlim([1 24]);
+xticks(1:24);
+
+% Ajustamos el eje Y para dar un pequeño margen superior.
+ylim([0 max([generacion_total, demanda]) + 3]);
+
